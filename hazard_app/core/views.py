@@ -98,10 +98,7 @@ def map_view(request):
     return render(request, "core/map.html", {"map": map_html})
 
 
-# -------------------------------------------------------
 # OPTIONAL API ENDPOINT
-# -------------------------------------------------------
-
 def health_status_api(request):
     """
     Optional API endpoint if frontend wants JSON data.
@@ -114,3 +111,4 @@ def health_status_api(request):
         "total_hospitals": len(hospitals),
         "total_earthquakes": len(earthquakes),
     })
+
