@@ -9,11 +9,7 @@ from .utils import haversine
 
 PROJECT_ROOT = settings.BASE_DIR
 
-
-# -------------------------------------------------
 # LOAD DATA
-# -------------------------------------------------
-
 def load_hospitals():
     cache_key = "hospitals_data"
     hospitals = cache.get(cache_key)
@@ -65,10 +61,7 @@ def load_earthquakes():
     return eqs
 
 
-# -------------------------------------------------
 # HOSPITAL LOAD PREDICTION MODEL
-# -------------------------------------------------
-
 def predict_hospital_load(beds, hazard_score):
     """
     Simple demand surge model:
@@ -82,11 +75,7 @@ def predict_hospital_load(beds, hazard_score):
 
     return load_percent
 
-
-# -------------------------------------------------
 # AI RISK CLASSIFICATION
-# -------------------------------------------------
-
 def ai_risk_classification(eq_mag, distance_km, load_percent):
 
     risk_score = 0
