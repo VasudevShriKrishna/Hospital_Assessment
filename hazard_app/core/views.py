@@ -12,10 +12,8 @@ from .services import (
     
 )
 from .utils import haversine
-# -------------------------------------------------------
-# MAIN MAP RENDER FUNCTION
-# -------------------------------------------------------
 
+# MAIN MAP RENDER FUNCTION
 def render_map(params: Dict):
 
     # Default center: USA centroid
@@ -33,10 +31,7 @@ def render_map(params: Dict):
 
     cluster = MarkerCluster(name="Hospitals").add_to(m)
 
-    # -------------------------------------------------------
     # HOSPITAL LAYER
-    # -------------------------------------------------------
-
     for hospital in hospitals:
 
         hospital_color = "green"
@@ -90,47 +85,13 @@ def render_map(params: Dict):
             icon=folium.CustomIcon(icon_url, icon_size=(30, 30))
         ).add_to(cluster)
 
-    # # -------------------------------------------------------
-    # # LEGEND BOX
-    # # -------------------------------------------------------
-
-    # legend_html = """
-    # <div style="
-    #     position: absolute;
-    #     top: 140px;
-    #     left: 40px;
-    #     width: 260px;
-    #     background-color: white;
-    #     border: 2px solid grey;
-    #     z-index: 9999;
-    #     font-size: 14px;
-    #     padding: 12px;
-    #     box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
-    # ">
-    # <b>Hazard Legend</b><br><br>
-
-    # 🔴 Red Hospital → Inside Impact Zone<br>
-    # 🟢 Green Hospital → Safe<br><br>
-
-    # 🟡 Yellow Circle → Minor(Mag < 4)<br>
-    # 🟠 Orange Circle → Moderate(Mag 4–5)<br>
-    # 🔴 Red Circle → Strong(Mag 5–6)<br>
-    # 🔥 Dark Red Circle → Severe(Mag ≥ 6)<br><br>
-    # </div>
-    # """
-
-    # m.get_root().html.add_child(folium.Element(legend_html))
+    
 
     folium.LayerControl().add_to(m)
 
     return m._repr_html_()
 
-
-    # 🚨 Predicted Load → Surge estimation<br>
-    # 🤖 AI Risk → LOW / MODERATE / HIGH / CRITICAL
-# -------------------------------------------------------
-# MAIN VIEW
-# -------------------------------------------------------IMP
+# MAIN VIEW   IMP
 
 def map_view(request):
     map_html = render_map(request.GET)
@@ -153,8 +114,3 @@ def health_status_api(request):
         "total_hospitals": len(hospitals),
         "total_earthquakes": len(earthquakes),
     })
-
-
-
-
-
