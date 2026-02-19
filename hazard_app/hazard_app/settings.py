@@ -79,17 +79,15 @@ WSGI_APPLICATION = 'hazard_app.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
+# IMP note : First create a DB name "hospital_db" on your server, and when you create a server remember or note your username and password
 DATABASES = {
     'default': {
-        'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'postgres',
-        'USER': 'postgres',
-        'PASSWORD': 'livebird',
+        'NAME': 'hospital_db',
+        'USER': 'your_username',
+        'PASSWORD': 'your_password',
         'HOST': 'localhost',
         'PORT': '5432',
-        }
     }
 }
 
@@ -129,5 +127,6 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
 
 
