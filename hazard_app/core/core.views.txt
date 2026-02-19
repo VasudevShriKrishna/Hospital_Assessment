@@ -1,0 +1,342 @@
+import folium
+from django.shortcuts import render
+from .data_loader import load_hospitals
+from .utils import find_nearest_hospital
+
+
+def map_view(request):
+    selected_lat = request.GET.get("lat")
+    selected_lon = request.GET.get("lon")
+
+    m = folium.Map(location=[39.5, -98.35], zoom_start=4)
+
+    hospitals = load_hospitals()
+
+    # Add all hospitals as small blue markers
+    for hospital in hospitals:
+        coords = hospital["geometry"]["coordinates"]
+        h_lon = coords[0]
+        h_lat = coords[1]
+        name = hospital["properties"]["NAME"]
+
+        folium.CircleMarker(
+            [h_lat, h_lon],
+            radius=3,
+            color="blue",
+            fill=True,
+            fill_opacity=0.7,
+            popup=name
+        ).add_to(m)
+
+    # If user clicked somewhere
+    if selected_lat and selected_lon:
+        lat = float(selected_lat)
+        lon = float(selected_lon)
+
+        nearest, distance = find_nearest_hospital(lat, lon, hospitals)
+
+        props = nearest["properties"]
+
+        popup_html = f"""
+        <b>Nearest Hospital</b><br>
+        Name: {props['NAME']}<br>
+        Address: {props['ADDRESS']}<br>
+        City: {props['CITY']}, {props['STATE']}<br>
+        Beds: {props['BEDS']}<br>
+        Distance: {distance} km
+        """
+
+        # Red marker at selected location
+        folium.Marker(
+            [lat, lon],
+            popup=popup_html,
+            icon=folium.Icon(color="red", icon="info-sign")
+        ).add_to(m)
+
+    return render(request, "core/map.html", {"map": m._repr_html_()})
+
+
+
+
+
+# import folium
+# import requests
+# from django.shortcuts import render
+# from django.http import JsonResponse
+
+# from .data_loader import load_hospitals, load_earthquakes
+# from .utils import haversine, earthquake_risk
+
+# def map_view(request):
+#     # Create base US map
+#     m = folium.Map(location=[39.5, -98.35], zoom_start=4)
+
+#     hospitals = load_hospitals()
+
+#     for hospital in hospitals:
+#         coords = hospital["geometry"]["coordinates"]
+
+#         longitude = coords[0]   # GeoJSON order
+#         latitude = coords[1]
+
+#         name = hospital["properties"].get("NAME", "Hospital")
+
+#         folium.Marker(
+#             [latitude, longitude],   # Folium expects lat, lon
+#             popup=name
+#         ).add_to(m)
+
+#     return render(request, "core/map.html", {
+#         "map": m._repr_html_()
+#     })
+
+
+# def nearest_hospital(request):
+#     lat = float(request.GET.get("lat"))
+#     lon = float(request.GET.get("lon"))
+
+#     hospitals = load_hospitals()
+#     earthquakes = load_earthquakes()
+
+#     # Nearest hospital
+#     nearest = None
+#     min_dist = float("inf")
+
+#     for h in hospitals:
+#         d = haversine(lat, lon, h["latitude"], h["longitude"])
+#         if d < min_dist:
+#             min_dist = d
+#             nearest = h
+
+#     # Earthquake risk
+#     max_risk = "NONE"
+
+#     for q in earthquakes:
+#         d_q = haversine(
+#             nearest["latitude"],
+#             nearest["longitude"],
+#             q["latitude"],
+#             q["longitude"]
+#         )
+
+#         risk = earthquake_risk(d_q, q["magnitude"])
+
+#         if risk == "HIGH":
+#             max_risk = "HIGH"
+#             break
+#         elif risk == "MEDIUM":
+#             max_risk = "MEDIUM"
+#         elif risk == "LOW" and max_risk == "NONE":
+#             max_risk = "LOW"
+
+#     # Weather API
+#     weather_url = (
+#         f"https://api.open-meteo.com/v1/forecast"
+#         f"?latitude={nearest['latitude']}"
+#         f"&longitude={nearest['longitude']}"
+#         f"&current_weather=true"
+#     )
+
+#     weather_data = requests.get(weather_url, timeout=5).json()
+#     current_weather = weather_data.get("current_weather", {})
+
+#     return JsonResponse({
+#         "hospital": nearest["name"],
+#         "distance_km": round(min_dist, 2),
+#         "earthquake_risk": max_risk,
+#         "temperature": current_weather.get("temperature"),
+#         "windspeed": current_weather.get("windspeed")
+#     })
+
+
+# import folium
+# import requests
+# from django.shortcuts import render
+# from django.http import JsonResponse
+
+# from .data_loader import load_hospitals, load_earthquakes
+# from .utils import haversine, earthquake_risk
+
+
+# def map_view(request):
+#     """
+#     Renders Folium map with hospital markers.
+#     """
+
+#     m = folium.Map(location=[39.5, -98.35], zoom_start=4)
+
+#     hospitals = load_hospitals()
+
+#     for hospital in hospitals:
+#         folium.Marker(
+#             location=[hospital["latitude"], hospital["longitude"]],
+#             popup=f'{hospital["name"]} ({hospital["state"]})'
+#         ).add_to(m)
+
+#     map_html = m._repr_html_()
+
+#     return render(request, "core/map.html", {"map": map_html})
+
+
+# def nearest_hospital(request):
+#     """
+#     Returns nearest hospital + earthquake risk + live weather.
+#     """
+
+#     lat = float(request.GET.get("lat"))
+#     lon = float(request.GET.get("lon"))
+
+#     hospitals = load_hospitals()
+#     earthquakes = load_earthquakes()
+
+#     # ---- Find nearest hospital ----
+#     nearest = None
+#     min_distance = float("inf")
+
+#     for hospital in hospitals:
+#         distance = haversine(
+#             lat, lon,
+#             hospital["latitude"],
+#             hospital["longitude"]
+#         )
+
+#         if distance < min_distance:
+#             min_distance = distance
+#             nearest = hospital
+
+#     # ---- Earthquake risk calculation ----
+#     max_risk = "NONE"
+
+#     for quake in earthquakes:
+#         quake_distance = haversine(
+#             nearest["latitude"],
+#             nearest["longitude"],
+#             quake["latitude"],
+#             quake["longitude"]
+#         )
+
+#         risk = earthquake_risk(quake_distance, quake["magnitude"])
+
+#         if risk == "HIGH":
+#             max_risk = "HIGH"
+#             break
+#         elif risk == "MEDIUM":
+#             max_risk = "MEDIUM"
+#         elif risk == "LOW" and max_risk == "NONE":
+#             max_risk = "LOW"
+
+#     # ---- Weather API ----
+#     weather_url = (
+#         f"https://api.open-meteo.com/v1/forecast"
+#         f"?latitude={nearest['latitude']}"
+#         f"&longitude={nearest['longitude']}"
+#         f"&current_weather=true"
+#     )
+
+#     weather_data = requests.get(weather_url, timeout=5).json()
+#     current_weather = weather_data.get("current_weather", {})
+
+#     return JsonResponse({
+#         "hospital": nearest["name"],
+#         "distance_km": round(min_distance, 2),
+#         "earthquake_risk": max_risk,
+#         "temperature_c": current_weather.get("temperature"),
+#         "windspeed_kmh": current_weather.get("windspeed")
+#     })
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+map.html:
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hospital Hazard Assessment</title>
+    <meta charset="utf-8">
+    <style>
+        #coords { margin:10px; font-weight:bold; }
+        #result { margin:10px; font-size:18px; color:darkred; }
+    </style>
+</head>
+<body>
+
+<div id="coords">Lat: -, Lon: -</div>
+<div id="result">Nearest Hospital: -</div>
+
+{{ map|safe }}
+
+<script>
+let clickCount = 0;
+let lastClickTime = 0;
+
+setTimeout(function() {
+
+    let map = window._leaflet_map;
+
+    map.on("click", function(e) {
+
+        let lat = e.latlng.lat;
+        let lon = e.latlng.lng;
+
+        document.getElementById("coords").innerText =
+            "Lat: " + lat.toFixed(6) +
+            " | Lon: " + lon.toFixed(6);
+
+        let now = new Date().getTime();
+
+        if (now - lastClickTime < 700) {
+            clickCount++;
+        } else {
+            clickCount = 1;
+        }
+
+        lastClickTime = now;
+
+        if (clickCount === 3) {
+
+            fetch(`/nearest/?lat=${lat}&lon=${lon}`)
+                .then(response => response.json())
+                .then(data => {
+
+                    document.getElementById("result").innerHTML =
+                        "<b>Nearest Hospital:</b> " + data.hospital +
+                        "<br>Distance: " + data.distance_km + " km" +
+                        "<br>Earthquake Risk: " + data.earthquake_risk +
+                        "<br>Temperature: " + data.temperature_c + " °C" +
+                        "<br>Wind Speed: " + data.windspeed_kmh + " km/h";
+                });
+
+            clickCount = 0;
+        }
+    });
+
+}, 1000);
+</script>
+
+</body>
+</html>
