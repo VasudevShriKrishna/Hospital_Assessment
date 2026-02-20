@@ -131,4 +131,3 @@ STATIC_URL = 'static/'
 
 
 
-
