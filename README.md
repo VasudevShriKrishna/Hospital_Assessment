@@ -6,6 +6,9 @@ This application visualizes hospitals on an interactive map, evaluates their ope
 
 ---
 
+⚠️ Status: Work in Progress (WIP)
+This project is currently under active development and is not yet complete.
+
 ## 🚀 Features
 
 - 🌍 Interactive Map Visualization using Folium (Leaflet.js)
