@@ -1,9 +1,3 @@
-"""
-HIGH-ACCURACY EARTHQUAKE DEPTH PREDICTOR
-Target: depth (log-transformed)
-Algorithm: XGBoost
-"""
-
 import os
 import sys
 import joblib
@@ -25,7 +19,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import RobustScaler
 from xgboost import XGBRegressor
 
-SAVE_PATH = r"G:\earthquake_today\earthquake_project\ml_models"
+SAVE_PATH = r"Your Saving Directory Path"
 MODEL_FILE = os.path.join(SAVE_PATH, "earthquake_pipeline_model.pkl")
 
 def train_model():
