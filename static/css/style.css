@@ -1,0 +1,67 @@
+/* Layout Containers */
+.dashboard-container {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+}
+
+.sidebar {
+    width: 320px;
+    background: #f8fafc;
+    border-right: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+    z-index: 1001;
+}
+
+.map-area {
+    flex-grow: 1;
+    position: relative;
+}
+
+/* Sidebar Styling */
+.sidebar-header {
+    margin-bottom: 25px;
+    border-bottom: 2px solid #e94e11;
+    padding-bottom: 10px;
+}
+
+.sidebar-header h2 { margin: 0; color: #1e293b; font-size: 20px; }
+.sidebar-header p { margin: 5px 0 0; color: #64748b; font-size: 12px; }
+
+h3 {
+    font-size: 14px;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 20px 0 10px;
+}
+
+/* Input Styling */
+.input-group {
+    background: white;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+}
+
+.input-group label { display: block; font-size: 11px; font-weight: bold; color: #64748b; }
+.input-group input { 
+    width: 100%; border: none; font-size: 18px; font-weight: bold; color: #1e293b; outline: none;
+}
+
+.helper-text { font-size: 11px; color: #94a3b8; margin-top: 8px; font-style: italic; }
+
+/* Result Components */
+.accuracy-card {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    margin-bottom: 15px;
+}
+
+/* Keep your existing .info-legend, .facility-badge, and .route-card styles here */
