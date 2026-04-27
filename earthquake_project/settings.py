@@ -75,12 +75,12 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'earthquake_project.wsgi.application'
 
-
+#You have to Download GDAL 
 # --- GeoDjango/GDAL Windows Configuration ---
 # Only configure on Windows (nt = Windows, posix = Linux/Mac)
 if os.name == 'nt':
     # 1. Define the root folder where OSGeo4W is installed
-    OSGEO4W_ROOT = r"C:\Users\Design1\AppData\Local\Programs\OSGeo4W"
+    OSGEO4W_ROOT = r"..\Local\Programs\OSGeo4W"
     
     # 2. Add the OSGeo4W 'bin' folder to the Windows PATH
     os.environ['PATH'] = os.path.join(OSGEO4W_ROOT, 'bin') + os.pathsep + os.environ['PATH']
@@ -96,9 +96,9 @@ if os.name == 'nt':
 DATABASES = {
     'default': {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'hospital_hazard',
+        'NAME': 'use Your DB name',
         'USER': 'postgres',
-        'PASSWORD': 'livebird',
+        'PASSWORD': 'Enter Your Password',
         'HOST': 'localhost',
         'PORT': '5432',
     }
@@ -134,10 +134,6 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 
 USE_TZ = True
-
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
 
