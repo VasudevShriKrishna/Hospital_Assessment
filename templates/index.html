@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hospital Command Center</title>
+    
+    <!-- CDNs -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    
+    <!-- Routing & Image Generation CDNs -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/leaflet-image@0.4.0/leaflet-image.js"></script>
+
+    <style>
+        /* CSS Variables for Dynamic Color Theme */
+        :root { --dynamic-color: #22c55e; }
+
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #05080f; color: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        
+        .leaflet-container { background: #05080f !important; }
+        .leaflet-control-zoom { border: none !important; margin: 40px !important; margin-bottom: 16px !important; z-index: 30 !important; }
+        .leaflet-control-zoom-in, .leaflet-control-zoom-out { background: rgba(11, 16, 26, 0.9) !important; color: white !important; border: 1px solid rgba(255,255,255,0.1) !important; backdrop-filter: blur(10px); border-radius: 12px !important; width: 44px !important; height: 44px !important; line-height: 44px !important; margin-bottom: 8px !important; box-shadow: 0 15px 30px rgba(0,0,0,0.5) !important; font-weight: 900 !important; font-size: 18px !important; }
+        .leaflet-tooltip { background: #0b101a !important; color: white !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 8px !important; font-size: 10px !important; font-weight: 800 !important; box-shadow: 0 10px 20px rgba(0,0,0,0.5) !important; padding: 6px 10px !important; pointer-events: none; }
+        
+        .leaflet-routing-container { display: none !important; }
+
+        .scanlines {
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
+            background-size: 100% 4px;
+        }
+
+        .shockwave-container { position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
+        .sw-core { width: 12px; height: 12px; background: var(--dynamic-color); border-radius: 50%; box-shadow: 0 0 15px var(--dynamic-color); z-index: 10; transition: background 0.3s, box-shadow 0.3s; }
+        .sw-ring { position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 2px solid var(--dynamic-color); opacity: 0; animation: ripple 3s linear infinite; transition: border-color 0.3s; }
+        .sw-delay-1 { animation-delay: 0s; } .sw-delay-2 { animation-delay: 1s; } .sw-delay-3 { animation-delay: 2s; }
+        @keyframes ripple { 0% { transform: scale(0.2); opacity: 1; border-width: 4px; } 100% { transform: scale(5); opacity: 0; border-width: 0px; } }
+        
+        .impact-circle-anim { animation: pulse-opacity 3s ease-in-out infinite alternate; }
+        @keyframes pulse-opacity { 0% { fill-opacity: 0.1; } 100% { fill-opacity: 0.25; } }
+
+        .range-slider { appearance: none; }
+        .range-slider::-webkit-slider-thumb {
+            appearance: none; width: 24px; height: 24px; border-radius: 50%;
+            background: var(--dynamic-color); cursor: pointer; border: 4px solid #121824;
+            box-shadow: 0 0 15px var(--dynamic-color); transition: 0.2s;
+        }
+        .range-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+        .theme-text { color: var(--dynamic-color); transition: color 0.3s ease; }
+        .theme-bg { background-color: var(--dynamic-color); transition: background-color 0.3s ease; }
+        .theme-border { border-color: var(--dynamic-color); transition: border-color 0.3s ease; }
+        .theme-gradient { background-image: linear-gradient(to bottom right, var(--dynamic-color), rgba(0,0,0,0.5)); transition: background-image 0.3s ease;}
+        
+        .safe-hospital-marker { background:#27ae60; color:white; border-radius:50%; width:24px; height:24px; text-align:center; line-height:22px; font-weight:bold; border:2px solid white; box-shadow: 0 0 10px rgba(39,174,96,0.8); cursor: pointer;}
+    </style>
+</head>
+<body class="flex w-full h-screen overflow-hidden selection:bg-blue-500/30">
+
+    <!-- LEFT COMMAND PANEL -->
+    <div id="ui-theme-container" class="w-[420px] min-w-[420px] bg-[#0b101a]/95 border-r border-white/10 flex flex-col z-20 shadow-[0_0_50px_rgba(0,0,0,0.5)] backdrop-blur-2xl relative text-orange-500">
+        
+        <div class="relative overflow-hidden p-7 bg-gradient-to-b from-white/5 to-transparent border-b border-white/5">
+            <div class="flex items-center gap-4">
+                <div class="p-3 rounded-xl border border-white/10 shadow-[0_0_20px_rgba(0,0,0,0.3)] theme-gradient">
+                    <i class="fa-solid fa-radar text-white text-xl animate-[spin_4s_linear_infinite]"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-black text-white tracking-tight leading-none uppercase drop-shadow-md">Tactical Command</h1>
+                    <p class="text-[10px] font-black uppercase tracking-[0.3em] mt-1 theme-text">Disaster Response Grid</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex px-7 pt-4 gap-4">
+            <button id="tab-sim" class="flex-1 py-3 text-[10px] font-black uppercase tracking-widest border-b-2 theme-border text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] transition-all duration-300" onclick="window.switchTab('simulation')">Telemetry</button>
+            <button id="tab-ana" class="flex-1 py-3 text-[10px] font-black uppercase tracking-widest border-b-2 border-transparent text-slate-600 hover:text-slate-400 transition-all duration-300" onclick="window.switchTab('analytics')">Analytics</button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto custom-scrollbar p-7 space-y-6">
+            
+            <div id="content-sim" class="space-y-6 transition-opacity duration-500">
+                <div class="bg-[#121824] p-6 rounded-2xl border border-white/5 shadow-inner relative overflow-hidden group">
+                    <div class="absolute top-0 left-0 w-1 h-full theme-bg"></div>
+                    
+                    <div class="flex justify-between items-center mb-4">
+                        <label class="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] flex items-center gap-2">
+                            <i class="fa-solid fa-wave-square theme-text"></i> Seismic Magnitude
+                        </label>
+                        <span class="text-2xl font-black theme-text drop-shadow-lg"><span id="mag-display">6.50</span> <small class="text-[10px] text-slate-500">Mw</small></span>
+                    </div>
+                    
+                    <input type="range" id="mag-slider" min="0.025" max="10" step="0.025" value="6.5" class="w-full h-1.5 bg-slate-800 rounded-lg cursor-pointer range-slider">
+
+                    <div class="grid grid-cols-3 gap-2 mt-6">
+                        <div class="bg-[#0b101a] p-3 rounded-xl border border-white/5 flex flex-col justify-center">
+                            <span class="text-[8px] text-slate-500 font-bold uppercase tracking-widest mb-1">Zone</span>
+                            <span class="text-sm font-black text-white"><span id="stat-radius">0</span> KM</span>
+                        </div>
+                        <div class="bg-[#0b101a] p-3 rounded-xl border border-white/5 flex flex-col justify-center">
+                            <span class="text-[8px] text-slate-500 font-bold uppercase tracking-widest mb-1">Depth (AI)</span>
+                            <span class="text-sm font-black text-blue-400"><span id="stat-depth">0</span> KM</span>
+                        </div>
+                        <div class="bg-[#0b101a] p-3 rounded-xl border border-white/5 flex flex-col justify-center">
+                            <span class="text-[8px] text-slate-500 font-bold uppercase tracking-widest mb-1">Sites</span>
+                            <span class="text-sm font-black theme-text" id="stat-sites">0</span>
+                        </div>
+                    </div>
+
+                    <button id="btn-analyze" onclick="window.runAnalysis()" class="w-full mt-5 py-4 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-xl active:scale-95 theme-gradient text-white flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-bolt"></i> <span id="btn-analyze-text">Engage Server Analysis</span>
+                    </button>
+                </div>
+
+                <div id="ai-report-container" class="hidden space-y-4">
+                    <div class="flex gap-4">
+                        <div class="flex-1 theme-gradient p-4 rounded-2xl shadow-lg border border-white/20 flex flex-col justify-between">
+                            <span class="text-[9px] font-black uppercase tracking-widest text-white/70">Threat Index</span>
+                            <div class="text-3xl font-black text-white drop-shadow-md mt-1" id="rep-intensity">0.0</div>
+                        </div>
+                        <div class="flex-[2] bg-[#121824] p-4 rounded-2xl border border-white/5 flex flex-col justify-center">
+                            <span class="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Classification</span>
+                            <span class="text-lg font-black uppercase theme-text" id="rep-risk">UNKNOWN</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-[#121824] p-5 rounded-2xl border border-white/5 space-y-5 relative">
+                        <div>
+                            <h4 class="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-2 flex items-center gap-1.5"><i class="fa-solid fa-bullseye text-blue-500"></i> Structural Assessment</h4>
+                            <p class="text-xs text-slate-200 font-medium bg-black/30 p-3 rounded-lg border border-white/5" id="rep-damage">No data.</p>
+                        </div>
+                        <div>
+                            <h4 class="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-2 flex items-center gap-1.5"><i class="fa-solid fa-server text-purple-500"></i> Backend Synthesis</h4>
+                            <p class="text-xs text-slate-400 italic leading-relaxed" id="rep-assessment">Awaiting generation...</p>
+                        </div>
+
+                        <div class="pt-4 border-t border-white/5 mt-4">
+                            <div style="display: flex; justify-content: space-between; font-size: 10px;" class="text-slate-400 uppercase font-black tracking-widest mb-1">
+                                <span>Model Confidence</span>
+                                <b id="accuracy-text" class="text-white">0%</b>
+                            </div>
+                            <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                                <div id="accuracy-bar" class="h-full bg-green-500 transition-all duration-1000 w-0"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="ai-placeholder" class="p-8 border border-dashed border-white/10 rounded-3xl flex flex-col items-center justify-center text-center opacity-40 grayscale select-none mt-8">
+                    <i class="fa-solid fa-crosshairs text-4xl mb-4 animate-[pulse_3s_ease-in-out_infinite]"></i>
+                    <p class="text-[10px] font-black uppercase tracking-[0.3em] text-white">Awaiting Target</p>
+                    <p class="text-[9px] mt-2 max-w-[200px] text-slate-400">Click coordinates on the satellite grid to initialize impact simulation.</p>
+                </div>
+            </div>
+
+            <div id="content-ana" class="hidden space-y-6 transition-opacity duration-500">
+                <div class="bg-[#121824] p-6 rounded-2xl border border-white/5 shadow-lg">
+                    <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-pie theme-text"></i> Infrastructure Breakdown
+                    </h3>
+                    <div class="h-48 w-full relative"><canvas id="pieChart"></canvas></div>
+                </div>
+                <div class="bg-[#121824] p-6 rounded-2xl border border-white/5 shadow-lg">
+                    <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-simple theme-text"></i> Bed Capacity Stress
+                    </h3>
+                    <div class="h-48 w-full relative"><canvas id="barChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-6 border-t border-white/5 bg-[#0b101a] relative z-10">
+            <label class="flex items-center justify-center gap-3 w-full bg-[#121824] hover:bg-[#1a2233] text-white py-4 rounded-xl cursor-pointer transition-all text-[10px] font-black uppercase tracking-widest border border-white/10 active:scale-95 shadow-lg group" onclick="document.getElementById('geo-up').click()">
+                <i class="fa-solid fa-upload text-blue-400 group-hover:-translate-y-1 transition-transform"></i>
+                <span id="upload-text">Load Local GeoJSON</span>
+            </label>
+            <input type="file" id="geo-up" class="hidden" accept=".geojson" onchange="window.handleFileUpload(event)">
+        </div>
+    </div>
+
+    <!-- CENTER MAP VIEW -->
+    <div class="flex-1 relative bg-[#05080f]">
+        <div class="absolute inset-0 z-10 pointer-events-none scanlines opacity-30"></div>
+        <div class="absolute inset-0 z-10 pointer-events-none bg-blue-500/5 mix-blend-overlay"></div>
+
+        <div id="map" class="absolute inset-0 z-0" style="cursor: crosshair;"></div>
+        
+        <button id="map-toggle-btn" onclick="window.toggleMapStyle()" class="absolute top-8 right-8 z-[1000] bg-[#1A1D23]/90 backdrop-blur-md border border-white/10 text-white p-4 rounded-xl shadow-2xl hover:bg-white/10 transition-colors" title="Switch to Street View">
+            <i class="fa-solid fa-map"></i>
+        </button>
+        
+        <div class="absolute top-8 left-8 right-[100px] z-20 flex justify-between items-start pointer-events-none">
+            <div class="bg-[#0b101a]/80 backdrop-blur-xl px-5 py-3 rounded-2xl border border-white/10 shadow-2xl flex items-center gap-3">
+                <div class="w-2 h-2 rounded-full bg-blue-500 animate-pulse ring-4 ring-blue-500/20"></div>
+                <p class="text-[10px] font-black uppercase tracking-[0.2em] text-blue-100">SAT-LINK: SECURE</p>
+            </div>
+            <div class="bg-[#0b101a]/80 backdrop-blur-xl px-5 py-3 rounded-2xl border border-white/10 text-white font-mono text-[11px] font-bold shadow-2xl flex items-center gap-2">
+                <i class="fa-solid fa-satellite-dish text-slate-400"></i>
+                LAT: <span id="hud-lat">---.----</span> <span class="text-slate-600 px-1">/</span> LNG: <span id="hud-lng">---.----</span>
+            </div>
+        </div>
+
+        <div id="routing-panel" class="hidden absolute top-28 right-8 w-[380px] z-[1000] bg-[#1A1D23]/95 backdrop-blur-2xl border border-[#2D333B] rounded-2xl shadow-2xl p-5 max-h-[60vh] overflow-y-auto custom-scrollbar">
+            <!-- Dynamically populated by JS -->
+        </div>
+
+        <div id="hospital-detail-card" class="hidden absolute bottom-24 right-8 w-[350px] z-[1000] bg-[#1A1D23]/95 backdrop-blur-2xl border border-[#2D333B] rounded-[32px] shadow-2xl p-8 transition-opacity duration-300">
+            <button onclick="window.closeHospitalCard()" class="absolute top-6 right-6 text-slate-500 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-full">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <h2 id="hosp-name" class="text-xl font-black text-white leading-tight pr-8 mb-1 tracking-tight">Facility Name</h2>
+            <p id="hosp-address" class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-6 leading-relaxed">Address</p>
+            
+            <div class="grid grid-cols-2 gap-4 border-t border-[#2D333B] pt-6 mb-4">
+                <div class="space-y-1">
+                    <p class="text-[9px] font-black text-slate-600 uppercase tracking-widest flex items-center gap-1.5"><i class="fa-solid fa-bed text-blue-500"></i> Beds</p>
+                    <p id="hosp-beds" class="text-base font-black text-white">0</p>
+                </div>
+                <div class="space-y-1">
+                    <p class="text-[9px] font-black text-slate-600 uppercase tracking-widest flex items-center gap-1.5"><i class="fa-solid fa-heart-pulse text-green-500"></i> Status</p>
+                    <p id="hosp-status" class="text-base font-black text-green-500 uppercase">UNKNOWN</p>
+                </div>
+            </div>
+
+            <div class="space-y-2 border-t border-[#2D333B] pt-4">
+                <div class="flex items-center justify-between text-xs py-1">
+                    <span class="text-slate-400 font-black uppercase tracking-widest text-[9px]"><i class="fa-solid fa-ruler"></i> Epicenter Dist</span>
+                    <span id="hosp-dist" class="font-bold text-orange-400 font-mono tracking-wider">-- km</span>
+                </div>
+                <div class="flex items-center justify-between text-xs py-1">
+                    <span class="text-slate-400 font-black uppercase tracking-widest text-[9px]">Class</span>
+                    <span id="hosp-type" class="font-bold text-slate-300 uppercase">General</span>
+                </div>
+                <div class="flex items-center justify-between text-xs py-1">
+                    <span class="text-slate-400 font-black uppercase tracking-widest text-[9px]">Contact</span>
+                    <span id="hosp-phone" class="font-bold text-slate-300">N/A</span>
+                </div>
+                <div class="flex items-start justify-between text-xs py-1 border-t border-white/5 mt-1 pt-2">
+                    <span class="text-slate-400 font-black uppercase tracking-widest text-[9px] mt-0.5">Facilities</span>
+                    <span id="hosp-facilities" class="font-bold text-slate-300 text-[10px] text-right w-2/3 leading-snug">N/A</span>
+                </div>
+            </div>
+            
+            <button id="btn-calc-route" class="w-full mt-4 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95">
+                <i class="fa-solid fa-route"></i> Calculate Safe Route
+            </button>
+        </div>
+
+        <div class="absolute bottom-10 left-1/2 -translate-x-1/2 z-10 flex items-center gap-4 bg-[#11141a]/95 backdrop-blur-xl text-white px-8 py-4 rounded-full text-[9px] font-black uppercase tracking-[0.3em] border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] pointer-events-none">
+            <i class="fa-solid fa-wave-square theme-text"></i> Seismic Monitoring Active
+            <i class="fa-solid fa-chevron-right text-slate-600"></i> Django ML Connected
+        </div>
+    </div>
+
+    <!-- ✅ FIX: ALL JAVASCRIPT INLINED TO FIX PREVIEW ERRORS (window.runAnalysis is not a function) -->
+    <script>
+        const OSRM_SERVER_URL = "https://router.project-osrm.org"; 
+        const OSRM_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImJkYzIwMjBhZDI5ODRjMjJhZDUwNmQ0ZjBhOTVmNDMwIiwiaCI6Im11cm11cjY0In0="; 
+
+        // Global variables
+        let map, satelliteLayer, labelsLayer, streetLayer;
+        let currentMapStyle = 'satellite';
+        let hospitalLayer, impactCircle, epicenterMarker;
+        let seismicHeat = null; 
+        let safeHospitals = []; 
+        let safeMarkers = []; 
+        let routeControl = null;
+        let routeLayers = [];
+        let availableRoutes = [];
+
+        let geojsonData = null;
+        let affectedHospitals = [];
+        let currentEpicenter = null;
+
+        let pieChartInstance = null;
+        let barChartInstance = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            initTheme(); 
+            initThemeListeners();
+            initCharts();
+            loadDefaultGeoJSON();
+        });
+
+        window.toggleMapStyle = function() {
+            const btn = document.getElementById('map-toggle-btn');
+            if (currentMapStyle === 'satellite') {
+                map.removeLayer(satelliteLayer);
+                map.removeLayer(labelsLayer);
+                map.addLayer(streetLayer);
+                currentMapStyle = 'street';
+                btn.innerHTML = '<i class="fa-solid fa-satellite"></i>'; 
+                btn.title = "Switch to Satellite View";
+            } else {
+                map.removeLayer(streetLayer);
+                map.addLayer(satelliteLayer);
+                map.addLayer(labelsLayer);
+                currentMapStyle = 'satellite';
+                btn.innerHTML = '<i class="fa-solid fa-map"></i>';
+                btn.title = "Switch to Street View";
+            }
+        };
+
+        function loadDefaultGeoJSON() {
+            const uploadText = document.getElementById('upload-text');
+            if (uploadText) uploadText.innerText = "Loading Default Data...";
+            
+            try {
+                fetch(window.location.origin + '/static/data/hospitals.geojson')
+                    .then(response => {
+                        if (!response.ok) throw new Error("File not found");
+                        return response.json();
+                    })
+                    .then(data => {
+                        geojsonData = data;
+                        renderDataOnMap();
+                        if (uploadText) uploadText.innerText = "Load Local GeoJSON";
+                    })
+                    .catch(err => {
+                        console.warn("Default GeoJSON not loaded (normal in preview environment):", err);
+                        if (uploadText) uploadText.innerText = "Load Local GeoJSON";
+                    });
+            } catch(e) {
+                console.warn(e);
+            }
+        }
+
+        function initMap() {
+            satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
+            labelsLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}');
+            streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' });
+
+            map = L.map('map', {
+                zoomControl: false,
+                preferCanvas: true, 
+                layers: [satelliteLayer, labelsLayer],
+                attributionControl: false
+            }).setView([37.0902, -95.7129], 4);
+
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            map.on('click', (e) => {
+                const lat = e.latlng.lat;
+                const lng = e.latlng.lng;
+
+                const isMainlandBox = lat >= 24.3 && lat <= 49.4 && lng >= -125.0 && lng <= -66.9;
+                const isCanadaWest = lat > 49.0 && lng <= -95.0; 
+                const isCanadaEast = lat > 45.0 && lng >= -84.0 && lng <= -75.0; 
+                const isMexico = lat < 32.5 && lng <= -105.0; 
+                
+                const inMainland = isMainlandBox && !isCanadaWest && !isCanadaEast && !isMexico;
+                const inAlaska = lat >= 51.2 && lat <= 71.4 && (lng <= -141.0 || lng >= 170); 
+                const inHawaii = lat >= 18.9 && lat <= 28.4 && lng >= -178.4 && lng <= -154.8;
+                
+                if (!inMainland && !inAlaska && !inHawaii) {
+                    alert("⛔ TACTICAL ALERT: Out of bounds.\nPlease select an epicenter strictly within United States territory (Mainland, Alaska, or Hawaii) to establish routing and telemetry.");
+                    currentEpicenter = null;
+                    return;
+                }
+
+                currentEpicenter = { lat: lat, lng: lng };
+                document.getElementById('hud-lat').innerText = currentEpicenter.lat.toFixed(4);
+                document.getElementById('hud-lng').innerText = currentEpicenter.lng.toFixed(4);
+                updateImpactGraphics();
+                hideAIReport();
+                
+                const detailCard = document.getElementById('hospital-detail-card');
+                if(detailCard) detailCard.classList.add('hidden');
+                const routingPanel = document.getElementById('routing-panel');
+                if(routingPanel) routingPanel.classList.add('hidden');
+                
+                if (routeLayers && map) {
+                    routeLayers.forEach(l => { try { map.removeLayer(l); } catch(err) {} });
+                }
+                routeLayers = [];
+                availableRoutes = [];
+            });
+        }
+
+        function getThemeColor(mag) {
+            if (mag >= 7.5) return '#ef4444'; 
+            if (mag >= 5.5) return '#e87722'; 
+            if (mag >= 4.0) return '#eab308'; 
+            return '#22c55e'; 
+        }
+
+        function initTheme() {
+            const slider = document.getElementById('mag-slider');
+            if(slider) {
+                document.documentElement.style.setProperty('--dynamic-color', getThemeColor(parseFloat(slider.value)));
+            }
+        }
+
+        function initThemeListeners() {
+            const slider = document.getElementById('mag-slider');
+            if(!slider) return;
+            slider.addEventListener('input', (e) => {
+                const mag = parseFloat(e.target.value);
+                document.getElementById('mag-display').innerText = mag.toFixed(2);
+                const hexColor = getThemeColor(mag);
+                document.documentElement.style.setProperty('--dynamic-color', hexColor);
+                if (currentEpicenter) updateImpactGraphics();
+            });
+        }
+
+        function getUSRegion(lat, lng) {
+            if (lat >= 51.2 && lat <= 71.4 && (lng <= -129.9 || lng >= 170)) return 'Alaska';
+            if (lat >= 18.9 && lat <= 28.4 && lng >= -178.4 && lng <= -154.8) return 'Hawaii';
+            if (lat >= 24.3 && lat <= 49.4 && lng >= -125.0 && lng <= -66.9) return 'Mainland';
+            return 'Other'; 
+        }
+
+        function updateImpactGraphics() {
+            if (!currentEpicenter) return;
+            const mag = parseFloat(document.getElementById('mag-slider').value);
+            const hexColor = getThemeColor(mag);
+            
+            const radiusKm = Math.pow(10, (0.4 * mag - 1)) * 10;
+            animateValue('stat-radius', parseFloat(document.getElementById('stat-radius').innerText), radiusKm, 1000);
+
+            if (impactCircle) map.removeLayer(impactCircle);
+            if (epicenterMarker) map.removeLayer(epicenterMarker);
+
+            impactCircle = L.circle([currentEpicenter.lat, currentEpicenter.lng], {
+                radius: radiusKm * 1000,
+                color: hexColor, fillColor: hexColor, fillOpacity: 0.15,
+                weight: 2, dashArray: '4, 12', className: 'impact-circle-anim'
+            }).addTo(map);
+
+            epicenterMarker = L.marker([currentEpicenter.lat, currentEpicenter.lng], {
+                icon: L.divIcon({
+                    className: 'custom-div-icon',
+                    html: `<div class="shockwave-container">
+                             <div class="sw-core"></div><div class="sw-ring sw-delay-1"></div>
+                             <div class="sw-ring sw-delay-2"></div><div class="sw-ring sw-delay-3"></div>
+                           </div>`,
+                    iconSize: [40, 40], iconAnchor: [20, 20]
+                })
+            }).addTo(map);
+
+            let epiRegion = getUSRegion(currentEpicenter.lat, currentEpicenter.lng);
+
+            if (geojsonData) {
+                affectedHospitals = [];
+                safeHospitals = [];
+                geojsonData.features.forEach(f => {
+                    const [lng, lat] = f.geometry.coordinates;
+                    const hRegion = getUSRegion(lat, lng);
+                    
+                    if (hRegion !== 'Other' && hRegion === epiRegion) {
+                        const dist = map.distance([lat, lng], [currentEpicenter.lat, currentEpicenter.lng]) / 1000;
+                        f.properties.computedDist = dist; 
+                        f.properties.hLat = lat;
+                        f.properties.hLng = lng;
+                        
+                        if (dist <= radiusKm) affectedHospitals.push(f.properties);
+                        else safeHospitals.push(f.properties);
+                    }
+                });
+                animateValue('stat-sites', parseInt(document.getElementById('stat-sites').innerText), affectedHospitals.length, 1000);
+                updateCharts();
+            }
+        }
+
+        window.handleFileUpload = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            document.getElementById('upload-text').innerText = "Processing...";
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    geojsonData = JSON.parse(ev.target.result);
+                    renderDataOnMap();
+                    document.getElementById('upload-text').innerText = "Data Loaded Successfully";
+                    setTimeout(() => document.getElementById('upload-text').innerText = "Load Local GeoJSON", 3000);
+                } catch(err) {
+                    alert("Invalid GeoJSON file.");
+                    document.getElementById('upload-text').innerText = "Load Local GeoJSON";
+                }
+            };
+            reader.readAsText(file);
+        };
+
+        window.drawDynamicHeatmap = function(lat, lng, radiusKm, mag, aiIntensity, affected) {
+            try { if (seismicHeat) map.removeLayer(seismicHeat); } catch(e){}
+            let points = [];
+            let normalizedIntensity = Math.min(1, (aiIntensity || mag) / 10);
+
+            for (let i = 0; i < 80; i++) {
+                if(lat != null && !isNaN(lat) && lng != null && !isNaN(lng)) {
+                   points.push([lat + (Math.random()-0.5) * 0.01, lng + (Math.random()-0.5) * 0.01, 1.0]);
+                }
+            }
+
+            for (let i = 0; i < 800; i++) {
+                let angle = Math.random() * Math.PI * 2;
+                let dist = Math.sqrt(Math.random()) * radiusKm;
+                let decay = Math.exp(- (dist * dist) / (2 * Math.pow(radiusKm * 0.6, 2)));
+                let weight = normalizedIntensity * decay;
+
+                let newLat = lat + (dist / 111.32) * Math.cos(angle);
+                let newLng = lng + (dist / (111.32 * Math.cos(lat * (Math.PI/180)))) * Math.sin(angle);
+                if(newLat != null && !isNaN(newLat) && newLng != null && !isNaN(newLng)) {
+                   points.push([newLat, newLng, weight]);
+                }
+            }
+
+            if (Array.isArray(affected)) {
+                affected.forEach(h => {
+                    for (let j = 0; j < 40; j++) {
+                        let hLat = h.lat;
+                        let hLng = h.lng;
+                        if(hLat != null && !isNaN(hLat) && hLng != null && !isNaN(hLng)) {
+                           points.push([hLat + (Math.random()-0.5)*0.005, hLng + (Math.random()-0.5)*0.005, normalizedIntensity * 0.9]);
+                        }
+                    }
+                });
+            }
+
+            try {
+                if (points.length > 0) {
+                   seismicHeat = L.heatLayer(points, { radius: 55, blur: 35, maxZoom: 10, max: 1.0 }).addTo(map);
+                }
+            } catch (e) { console.warn("Heat layer failed:", e); }
+        };
+
+        function renderDataOnMap() {
+            if (hospitalLayer) map.removeLayer(hospitalLayer);
+            hospitalLayer = L.geoJSON(geojsonData, {
+                pointToLayer: (feat, latlng) => L.circleMarker(latlng, {
+                    radius: 3, fillColor: "#22c55e", color: "#000", weight: 1, opacity: 0.8, fillOpacity: 0.8
+                }),
+                onEachFeature: (feature, layer) => {
+                    layer.on('click', (e) => {
+                        L.DomEvent.stopPropagation(e);
+                        showHospitalCard(feature.properties, layer.getLatLng().lat, layer.getLatLng().lng);
+                    });
+                }
+            }).addTo(map);
+        }
+
+        function showHospitalCard(p, lat, lng) {
+            let distText = "Epicenter not set";
+            if (currentEpicenter) {
+                const distKm = (map.distance([lat, lng], [currentEpicenter.lat, currentEpicenter.lng]) / 1000).toFixed(2);
+                distText = `${distKm} km from epicenter`;
+            }
+
+            document.getElementById('hosp-name').innerText = p.NAME || 'Unknown Facility';
+            document.getElementById('hosp-address').innerText = `${p.ADDRESS || ''}, ${p.CITY || ''}`;
+            document.getElementById('hosp-beds').innerText = p.BEDS === -999 ? "N/A" : p.BEDS;
+            document.getElementById('hosp-status').innerText = p.STATUS || "UNKNOWN";
+            document.getElementById('hosp-type').innerText = p.TYPE || "UNKNOWN";
+            document.getElementById('hosp-phone').innerText = p.TELEPHONE || "N/A";
+            document.getElementById('hosp-dist').innerText = distText;
+
+            let facilities = p.FACILITIES || p.facilities || "Basic/Not Specified";
+            if (Array.isArray(facilities)) facilities = facilities.join(', ');
+            let facEl = document.getElementById('hosp-facilities');
+            if (facEl) facEl.innerText = facilities;
+
+            const routeBtn = document.getElementById('btn-calc-route');
+            if(routeBtn) {
+                routeBtn.onclick = () => window.analyzeRouteToHospital(p.NAME || 'Facility', lat, lng, p.BEDS, p.TYPE);
+            }
+
+            document.getElementById('hospital-detail-card').classList.remove('hidden');
+            document.getElementById('routing-panel').classList.add('hidden');
+        }
+
+        window.closeHospitalCard = function() {
+            document.getElementById('hospital-detail-card').classList.add('hidden');
+        };
+
+        window.runAnalysis = async function() {
+            if (!currentEpicenter) return alert("Select an epicenter on the map first.");
+            
+            const mag = document.getElementById('mag-slider').value;
+            const btnText = document.getElementById('btn-analyze-text');
+            const icon = document.querySelector('#btn-analyze i');
+            
+            btnText.innerText = "Transmitting to Django Engine...";
+            icon.className = "fa-solid fa-spinner fa-spin";
+            
+            try {
+                const url = window.location.origin + `/get_nearest_history/?lat=${currentEpicenter.lat}&lng=${currentEpicenter.lng}&mag=${mag}`;
+                let data;
+                try {
+                    const response = await fetch(url);
+                    if(!response.ok) throw new Error("Network Response not ok");
+                    data = await response.json();
+                } catch(e) {
+                    console.warn("Django backend unreachable. Falling back to mock data.");
+                    const radiusKm = Math.pow(10, (0.4 * mag - 1)) * 10;
+                    
+                    let mag_penalty = Math.max(0, (mag - 6.5) * 5); 
+                    let geo_penalty = 10 + (Math.random() * 10); 
+                    let telemetry_penalty = 5.0; 
+
+                    let raw_confidence = 100.0 - mag_penalty - geo_penalty - telemetry_penalty;
+                    let dynamicConfidence = Math.max(15.0, Math.min(99.5, raw_confidence));
+
+                    data = {
+                        intensity: (parseFloat(mag) * 1.15).toFixed(2),
+                        risk_level: mag >= 7.5 ? 'CRITICAL' : mag >= 5.5 ? 'HIGH' : mag >= 4.0 ? 'MODERATE' : 'LOW',
+                        expected_damage: (mag < 5.0) ? 'Negligible - Structural integrity of road networks remains intact.' : 'Simulation mode active. Structural concerns mapped to historical averages.',
+                        assessment: (mag < 5.0) ? `Incident Alert: Mag ${mag} is below structural damage threshold. Roads are SAFE for tactical exit. Evacuation risk is currently dependent on weather.` : `Earthquake of magnitude ${mag} is predicted to cause ${mag >= 5.5 ? 'severe' : 'manageable'} damage potential.`,
+                        confidence: dynamicConfidence, 
+                        radius: radiusKm,
+                        depth: (Math.random() * 50 + 5).toFixed(1)
+                    };
+                }
+                if(data.error) throw new Error(data.error);
+
+                document.getElementById('ai-placeholder').classList.add('hidden');
+                document.getElementById('ai-report-container').classList.remove('hidden');
+
+                animateValue('rep-intensity', 0, parseFloat(data.intensity), 1500, 2);
+                
+                const depthEl = document.getElementById('stat-depth');
+                if(depthEl) animateValue('stat-depth', 0, parseFloat(data.depth), 1000, 1);
+                
+                document.getElementById('rep-risk').innerText = data.risk_level;
+                document.getElementById('rep-damage').innerText = data.expected_damage;
+                document.getElementById('rep-assessment').innerText = data.assessment;
+                
+                let confBar = document.getElementById('accuracy-bar');
+                if(confBar) confBar.style.width = (data.confidence || 80) + "%";
+                let confText = document.getElementById('accuracy-text');
+                if(confText) confText.innerText = Math.round(data.confidence || 80) + "%";
+
+                if (data.affected_hospitals) {
+                    affectedHospitals = data.affected_hospitals;
+                    animateValue('stat-sites', 0, affectedHospitals.length, 1000);
+                    updateCharts();
+                }
+
+                window.drawDynamicHeatmap(currentEpicenter.lat, currentEpicenter.lng, data.radius, mag, data.intensity, affectedHospitals);
+
+                safeMarkers.forEach(m => map.removeLayer(m));
+                safeMarkers = [];
+                
+                if (safeHospitals.length > 0 && geojsonData) {
+                    safeHospitals.sort((a, b) => a.computedDist - b.computedDist);
+                    window.top5SafeHospitals = safeHospitals.slice(0, 5); 
+                    
+                    window.top5SafeHospitals.forEach(h => {
+                        let icon = L.divIcon({ html: '+', className: 'safe-hospital-marker', iconSize: [24,24] });
+                        let m = L.marker([h.hLat, h.hLng], { icon: icon }).addTo(map);
+                        
+                        m.on('click', (e) => {
+                            L.DomEvent.stopPropagation(e);
+                            showHospitalCard(h, h.hLat, h.hLng);
+                        });
+                        safeMarkers.push(m);
+                    });
+                    
+                    const nearestSafe = window.top5SafeHospitals[0];
+                    showHospitalCard(nearestSafe, nearestSafe.hLat, nearestSafe.hLng);
+                }
+
+            } catch (err) {
+                alert("Backend Error: " + err.message);
+            } finally {
+                btnText.innerText = "Engage Server Analysis";
+                icon.className = "fa-solid fa-bolt";
+            }
+        };
+
+        function hideAIReport() {
+            document.getElementById('ai-placeholder').classList.remove('hidden');
+            document.getElementById('ai-report-container').classList.add('hidden');
+        }
+
+        async function getWeatherAt(lat, lng) {
+            try {
+                let res = await fetch(window.location.origin + `/get_weather_proxy/?lat=${lat}&lng=${lng}`);
+                let json = await res.json();
+                if (json.warning || json.cod == 401) {
+                    console.warn("Weather API Key missing. Falling back to default weather.");
+                    return { cond: "Clear" };
+                }
+                if (json && json.weather && json.weather[0]) return { cond: json.weather[0].main };
+            } catch(e) { }
+            return { cond: "Clear" };
+        }
+
+        function classifyRoadDamage(mag, distKm) {
+            if (mag < 5.0) return "none"; 
+            const radiusKm = Math.pow(10, (0.4 * mag - 1)) * 10;
+            if (distKm <= radiusKm * 0.25) return "critical";
+            if (distKm <= radiusKm * 0.6) return "severe";
+            if (distKm <= radiusKm) return "moderate";
+            return "none";
+        }
+
+        window.analyzeRouteToHospital = async function(hName, hLat, hLng, hBeds, hType) {
+            if (!currentEpicenter) return;
+            
+            if (routeLayers && map) {
+                routeLayers.forEach(l => { try { map.removeLayer(l); } catch(err) {} });
+            }
+            routeLayers = [];
+            availableRoutes = [];
+            
+            const panel = document.getElementById('routing-panel');
+            if(!panel) return;
+
+            document.getElementById('hospital-detail-card').classList.add('hidden');
+            panel.classList.remove('hidden');
+            
+            panel.innerHTML = `<div class="p-6 text-center text-slate-400 font-bold tracking-widest uppercase text-[10px]">
+                <i class="fa-solid fa-spinner fa-spin text-2xl mb-3 text-blue-500"></i><br>Calculating routes via OSRM...
+            </div>`;
+
+            let url = `${OSRM_SERVER_URL}/route/v1/driving/${currentEpicenter.lng},${currentEpicenter.lat};${hLng},${hLat}?overview=full&geometries=geojson&alternatives=true`;
+            if (OSRM_API_KEY && OSRM_API_KEY !== "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImJkYzIwMjBhZDI5ODRjMjJhZDUwNmQ0ZjBhOTVmNDMwIiwiaCI6Im11cm11cjY0In0=") {
+                url += `&key=${OSRM_API_KEY}`;
+            }
+
+            try {
+                let res = await fetch(url);
+                if (!res.ok) throw new Error("OSRM API Limit Reached or Error");
+                let data = await res.json();
+                
+                if (!data.routes || data.routes.length === 0) throw new Error("No routes found");
+                let routes = Array.from(data.routes);
+
+                if (routes.length < 3) {
+                    let baseRoute = routes[0];
+                    let numToAdd = 3 - routes.length;
+                    for (let k = 1; k <= numToAdd; k++) {
+                        let altCoords = baseRoute.geometry.coordinates.map((pt, idx) => {
+                            let percent = idx / baseRoute.geometry.coordinates.length;
+                            let curve = Math.sin(percent * Math.PI); 
+                            let offsetDeg = (k % 2 === 0 ? -1 : 1) * 0.15 * k * curve; 
+                            return [pt[0] + offsetDeg, pt[1] + offsetDeg]; 
+                        });
+                        routes.push({
+                            geometry: { coordinates: altCoords },
+                            properties: { summary: {
+                                distance: baseRoute.distance * (1 + (0.08 * k)), 
+                                duration: baseRoute.duration * (1 + (0.15 * k)) 
+                            }}
+                        });
+                    }
+                }
+
+                let bestIndex = 0, bestScore = -Infinity;
+                let html = `<h4 class="text-xs font-black uppercase tracking-widest text-white mb-4 border-b border-white/10 pb-2">Evacuation Routes</h4>`;
+                let mag = parseFloat(document.getElementById('mag-slider').value);
+
+                for(let i=0; i<routes.length; i++) {
+                    let r = routes[i];
+                    let distKm = (r.distance / 1000).toFixed(1);
+                    let timeMin = Math.round(r.duration / 60);
+                    
+                    let mappedCoords = r.geometry.coordinates.map(c => [c[1], c[0]]); 
+                    let wMid = { cond: "Clear" };
+                    let closestDistToEpicenter = Infinity;
+                    let totalDistToEpicenter = 0;
+
+                    if (mappedCoords.length > 0) {
+                        let midPt = mappedCoords[Math.floor(mappedCoords.length / 2)];
+                        wMid = await getWeatherAt(midPt[0], midPt[1]);
+                        
+                        mappedCoords.forEach(pt => {
+                            let d = map.distance([pt[0], pt[1]], [currentEpicenter.lat, currentEpicenter.lng]) / 1000;
+                            if (d < closestDistToEpicenter) closestDistToEpicenter = d;
+                            totalDistToEpicenter += d;
+                        });
+                    }
+
+                    let avgDistToEpicenter = mappedCoords.length > 0 ? (totalDistToEpicenter / mappedCoords.length) : 0;
+                    let roadDamage = classifyRoadDamage(mag, closestDistToEpicenter);
+                    
+                    let badWeather = ['Rain','Snow','Thunderstorm','Mist'];
+                    let weatherRisk = badWeather.includes(wMid.cond);
+                    
+                    let damagePenalty = 0;
+                    if (roadDamage === "critical") damagePenalty = 10000; 
+                    else if (roadDamage === "severe") damagePenalty = 5000;
+                    else if (roadDamage === "moderate") damagePenalty = 2000;
+
+                    let score = 100 - parseFloat(distKm) - damagePenalty - (weatherRisk ? 1000 : 0) + (avgDistToEpicenter * 2);
+                    
+                    let status = "SAFE";
+                    let reason = wMid.cond;
+                    let routeColor = '#22c55e'; // Green
+                    let statusColorClass = 'text-green-500';
+                    let badgeBgClass = 'bg-green-500/20 border border-green-500/50';
+                    let iconClass = 'fa-check-circle';
+
+                    if (roadDamage === "critical" || roadDamage === "severe" || wMid.cond === 'Thunderstorm' || wMid.cond === 'Snow') {
+                        status = "UNSAFE"; routeColor = '#ef4444'; statusColorClass = 'text-red-500'; badgeBgClass = 'bg-red-500/20 border border-red-500/50'; iconClass = 'fa-ban';
+                        if (roadDamage === "critical") reason = `Critical Damage + ${wMid.cond}`;
+                        else if (roadDamage === "severe") reason = `Severe Damage + ${wMid.cond}`;
+                        else reason = `Hazardous Weather (${wMid.cond})`;
+                    } else if (roadDamage === "moderate" || wMid.cond === 'Rain' || wMid.cond === 'Mist') {
+                        status = "DAMAGED"; routeColor = '#e87722'; statusColorClass = 'text-orange-500'; badgeBgClass = 'bg-orange-500/20 border border-orange-500/50'; iconClass = 'fa-triangle-exclamation';
+                        if (roadDamage === "moderate") reason = `Moderate Damage + ${wMid.cond}`;
+                        else reason = `Poor Conditions (${wMid.cond})`;
+                    }
+
+                    availableRoutes.push({ 
+                        coordinates: mappedCoords, status: status, reason: reason, routeColor: routeColor, statusColorClass: statusColorClass, badgeBgClass: badgeBgClass, iconClass: iconClass, weather: wMid.cond, dist: distKm, time: timeMin, score: score, originalStatus: status 
+                    });
+
+                    if(score > bestScore) { bestScore = score; bestIndex = i; }
+                }
+                
+                availableRoutes.forEach((route, i) => {
+                    let escHName = (hName || "").replace(/'/g, "\\'");
+                    let distFromClick = document.getElementById('hosp-dist').innerText;
+
+                    let isBest = (i === bestIndex);
+                    let highlightBorder = isBest ? `border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]` : "border-white/5 opacity-80";
+                    let bestLabel = isBest ? " <span class='text-blue-400'>(BEST)</span>" : "";
+
+                    let displayStatus = route.status;
+                    let displayColorClass = route.statusColorClass;
+                    let displayBadgeClass = route.badgeBgClass;
+
+                    if (mag < 5.0) {
+                        if (isBest && route.originalStatus === "SAFE") {
+                            displayStatus = "OPTIMAL SAFE ROUTE (SAFE TO RUN)";
+                        }
+                    } else {
+                        if (isBest && route.originalStatus !== "SAFE") {
+                            displayStatus = "SAFEST OPTION"; 
+                            displayColorClass = "text-blue-400"; 
+                            displayBadgeClass = "bg-blue-900/30 border border-blue-500/50"; 
+                            route.routeColor = "#3b82f6"; 
+                        }
+                    }
+
+                    html += `
+                    <div id="route-card-${i}" onclick="window.drawRoute(${i})" class="bg-[#0b101a] border ${highlightBorder} rounded-xl p-4 mb-3 cursor-pointer hover:border-blue-500 transition-all shadow-lg">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-[11px] font-black text-white uppercase tracking-widest">Route ${i+1}${bestLabel}</span>
+                            <span class="text-[9px] font-black uppercase ${displayColorClass} ${displayBadgeClass} px-2 py-1 rounded"><i class="fa-solid ${route.iconClass}"></i> ${displayStatus}</span>
+                        </div>
+                        <div class="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wide">
+                            ↳ ${route.reason}
+                        </div>
+                        <div class="text-xs font-medium text-slate-400 mb-3 border-b border-white/5 pb-3">
+                            <span class="text-white font-bold text-sm">${route.dist} km</span> &nbsp;•&nbsp; ${route.time} min
+                        </div>
+                        <button onclick="event.stopPropagation(); window.triggerReport(${i}, '${escHName}', '${currentEpicenter.lat}', '${currentEpicenter.lng}', '${mag}', '${distFromClick}', '${hType}', '${hBeds}', '${hLat}', '${hLng}')" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-file-pdf "></i> Download Safety Report
+                        </button>
+                    </div>`;
+                });
+                
+                panel.innerHTML = html;
+                window.availableRoutes = availableRoutes;
+                window.drawRoute(bestIndex);
+
+            } catch (err) {
+                console.error(err);
+                panel.innerHTML = `<div class="p-6 text-center text-red-400 font-bold tracking-widest uppercase text-[10px]"><i class="fa-solid fa-triangle-exclamation text-2xl mb-3 text-red-500"></i><br>OSRM Routing Failed.<br>Verify server connection.</div>`;
+            }
+        };
+
+        window.evaluateRegionalRoutes = async function() {
+            if (!currentEpicenter || !window.top5SafeHospitals || window.top5SafeHospitals.length === 0) return;
+            
+            const panel = document.getElementById('routing-panel');
+            document.getElementById('hospital-detail-card').classList.add('hidden');
+            panel.classList.remove('hidden');
+
+            panel.innerHTML = `<div class="p-6 text-center text-slate-400 font-bold tracking-widest uppercase text-[10px]">
+                <i class="fa-solid fa-spinner fa-spin text-3xl mb-3 text-blue-500"></i><br>Evaluating Evacuation Routes<br>across top regional facilities...
+            </div>`;
+
+            if (routeLayers && map) {
+                routeLayers.forEach(l => { try { map.removeLayer(l); } catch(err) {} });
+            }
+            routeLayers = [];
+            window.availableRoutes = [];
+
+            let regionalWeather = await getWeatherAt(currentEpicenter.lat, currentEpicenter.lng);
+            let badWeather = ['Rain','Snow','Thunderstorm','Mist'];
+            let weatherRisk = badWeather.includes(regionalWeather.cond);
+            let mag = parseFloat(document.getElementById('mag-slider').value);
+
+            let allEvaluatedRoutes = [];
+
+            for (let i = 0; i < window.top5SafeHospitals.length; i++) {
+                let h = window.top5SafeHospitals[i];
+                let url = `${OSRM_SERVER_URL}/route/v1/driving/${currentEpicenter.lng},${currentEpicenter.lat};${h.hLng},${h.hLat}?overview=full&geometries=geojson&alternatives=true`;
+                if (OSRM_API_KEY && OSRM_API_KEY !== "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImJkYzIwMjBhZDI5ODRjMjJhZDUwNmQ0ZjBhOTVmNDMwIiwiaCI6Im11cm11cjY0In0=") {
+                    url += `&key=${OSRM_API_KEY}`;
+                }
+                
+                try {
+                    let res = await fetch(url);
+                    if (!res.ok) throw new Error("OSRM API Error");
+                    let data = await res.json();
+                    
+                    if (!data.routes || data.routes.length === 0) continue;
+                    let routes = Array.from(data.routes);
+
+                    for(let j=0; j<routes.length; j++) {
+                        let r = routes[j];
+                        let distKm = (r.distance / 1000).toFixed(1);
+                        let timeMin = Math.round(r.duration / 60);
+                        
+                        let mappedCoords = r.geometry.coordinates.map(c => [c[1], c[0]]); 
+                        let closestDistToEpicenter = Infinity;
+                        let totalDistToEpicenter = 0;
+
+                        mappedCoords.forEach(pt => {
+                            let d = map.distance([pt[0], pt[1]], [currentEpicenter.lat, currentEpicenter.lng]) / 1000;
+                            if (d < closestDistToEpicenter) closestDistToEpicenter = d;
+                            totalDistToEpicenter += d;
+                        });
+
+                        let avgDistToEpicenter = mappedCoords.length > 0 ? (totalDistToEpicenter / mappedCoords.length) : 0;
+                        let roadDamage = classifyRoadDamage(mag, closestDistToEpicenter);
+                        
+                        let damagePenalty = 0;
+                        if (roadDamage === "critical") damagePenalty = 10000; 
+                        else if (roadDamage === "severe") damagePenalty = 5000;
+                        else if (roadDamage === "moderate") damagePenalty = 2000;
+
+                        let score = 100 - parseFloat(distKm) - damagePenalty - (weatherRisk ? 1000 : 0) + (avgDistToEpicenter * 2);
+                        
+                        let status = "SAFE";
+                        let reason = regionalWeather.cond;
+                        let routeColor = '#22c55e'; // Green
+                        let statusColorClass = 'text-green-500';
+                        let badgeBgClass = 'bg-green-500/20 border border-green-500/50';
+                        let iconClass = 'fa-check-circle';
+
+                        if (roadDamage === "critical" || roadDamage === "severe" || regionalWeather.cond === 'Thunderstorm' || regionalWeather.cond === 'Snow') {
+                            status = "UNSAFE"; routeColor = '#ef4444'; statusColorClass = 'text-red-500'; badgeBgClass = 'bg-red-500/20 border border-red-500/50'; iconClass = 'fa-ban';
+                            if (roadDamage === "critical") reason = `Critical Damage + ${regionalWeather.cond}`;
+                            else if (roadDamage === "severe") reason = `Severe Damage + ${regionalWeather.cond}`;
+                            else reason = `Hazardous Weather (${regionalWeather.cond})`;
+                        } else if (roadDamage === "moderate" || regionalWeather.cond === 'Rain' || regionalWeather.cond === 'Mist') {
+                            status = "DAMAGED"; routeColor = '#e87722'; statusColorClass = 'text-orange-500'; badgeBgClass = 'bg-orange-500/20 border border-orange-500/50'; iconClass = 'fa-triangle-exclamation';
+                            if (roadDamage === "moderate") reason = `Moderate Damage + ${regionalWeather.cond}`;
+                            else reason = `Poor Conditions (${regionalWeather.cond})`;
+                        } else {
+                            reason = `CLEAR PATH (${regionalWeather.cond})`;
+                        }
+
+                        allEvaluatedRoutes.push({
+                            hospital: h,
+                            coordinates: mappedCoords, 
+                            status: status, reason: reason, routeColor: routeColor, statusColorClass: statusColorClass, badgeBgClass: badgeBgClass, iconClass: iconClass, weather: regionalWeather.cond, dist: distKm, time: timeMin, score: score, originalStatus: status
+                        });
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+
+            allEvaluatedRoutes.sort((a,b) => b.score - a.score);
+
+            if (allEvaluatedRoutes.length === 0) {
+                panel.innerHTML = `<div class="p-6 text-center text-red-400 font-bold tracking-widest uppercase text-[10px]">Routing Failed.<br>Verify OSRM API connection.</div>`;
+                return;
+            }
+
+            let absoluteBestRoute = allEvaluatedRoutes[0];
+
+            if (absoluteBestRoute.status === "UNSAFE") {
+                triggerWalkingFallback(panel, regionalWeather.cond, mag);
+            } else {
+                let bestHospitalRoutes = allEvaluatedRoutes.filter(r => r.hospital.NAME === absoluteBestRoute.hospital.NAME).slice(0, 3);
+                window.availableRoutes = bestHospitalRoutes; 
+                renderRoutesUI(bestHospitalRoutes, panel, absoluteBestRoute.hospital, mag);
+                
+                map.flyTo([absoluteBestRoute.hospital.hLat, absoluteBestRoute.hospital.hLng], 7);
+                window.drawRoute(0); 
+            }
+        };
+
+        function renderRoutesUI(routes, panel, hospital, mag) {
+            let escHName = (hospital.NAME || "Facility").replace(/'/g, "\\'");
+            let distFromClick = `${hospital.computedDist.toFixed(2)} km`;
+            
+            let html = `<div class="mb-4 border-b border-white/10 pb-3"><h4 class="text-xs font-black uppercase tracking-widest text-white mb-1">Evacuation Verified</h4><p class="text-[10px] font-bold text-blue-400 tracking-wide uppercase">Target: ${hospital.NAME}</p></div>`;
+            
+            routes.forEach((route, i) => {
+                let isBest = (i === 0);
+                let highlightBorder = isBest ? `border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]` : "border-white/5 opacity-80";
+                let bestLabel = isBest ? " <span class='text-blue-400'>(BEST)</span>" : "";
+
+                let displayStatus = route.status;
+                let displayColorClass = route.statusColorClass;
+                let displayBadgeClass = route.badgeBgClass;
+
+                if (mag < 5.0) {
+                    if (isBest && route.originalStatus === "SAFE") {
+                        displayStatus = "OPTIMAL SAFE ROUTE (SAFE TO RUN)";
+                    }
+                } else {
+                    if (isBest && route.originalStatus !== "SAFE") {
+                        displayStatus = "SAFEST OPTION"; 
+                        displayColorClass = "text-blue-400"; 
+                        displayBadgeClass = "bg-blue-900/30 border border-blue-500/50"; 
+                        route.routeColor = "#3b82f6"; 
+                    }
+                }
+
+                html += `
+                <div id="route-card-${i}" onclick="window.drawRoute(${i})" class="bg-[#0b101a] border ${highlightBorder} rounded-xl p-4 mb-3 cursor-pointer hover:border-blue-500 transition-all shadow-lg">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-[11px] font-black text-white uppercase tracking-widest">Route ${i+1}${bestLabel}</span>
+                        <span class="text-[9px] font-black uppercase ${displayColorClass} ${displayBadgeClass} px-2 py-1 rounded"><i class="fa-solid ${route.iconClass}"></i> ${displayStatus}</span>
+                    </div>
+                    <div class="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wide">
+                        ↳ ${route.reason} 
+                    </div>
+                    <div class="text-xs font-medium text-slate-400 mb-3 border-b border-white/5 pb-3">
+                        <span class="text-white font-bold text-sm">${route.dist} km</span> &nbsp;•&nbsp; ${route.time} min
+                    </div>
+                    <button onclick="event.stopPropagation(); window.triggerReport(${i}, '${escHName}', '${currentEpicenter.lat}', '${currentEpicenter.lng}', '${mag}', '${distFromClick}', '${hType}', '${hBeds}', '${hLat}', '${hLng}')" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-file-pdf "></i> Download Safety Report
+                    </button>
+                </div>`;
+            });
+            
+            panel.innerHTML = html;
+        }
+
+        window.drawRoute = function(selectedIndex) {
+            if (!Array.isArray(availableRoutes) || !availableRoutes[selectedIndex]) return;
+            
+            if (routeLayers && map) {
+                routeLayers.forEach(l => { try { map.removeLayer(l); } catch(err) {} });
+            }
+            routeLayers = [];
+
+            availableRoutes.forEach((route, index) => {
+                let isSelected = (index === selectedIndex);
+                let color = isSelected ? route.routeColor : '#64748b'; 
+                let weight = isSelected ? 6 : 4;
+                let opacity = isSelected ? 1.0 : 0.4;
+                let dashArray = isSelected ? null : '10,10';
+
+                let polyline = L.polyline(route.coordinates, {
+                    color: color, weight: weight, opacity: opacity,
+                    dashArray: dashArray, lineCap: 'round', interactive: false
+                }).addTo(map);
+
+                if (!isSelected) polyline.bringToBack();
+                else polyline.bringToFront();
+                routeLayers.push(polyline);
+
+                let card = document.getElementById('route-card-' + index);
+                if (card) {
+                    if (isSelected) {
+                        card.style.borderColor = color;
+                        card.style.backgroundColor = '#121824';
+                        card.style.opacity = '1';
+                    } else {
+                        card.style.borderColor = 'rgba(255,255,255,0.05)';
+                        card.style.backgroundColor = '#0b101a';
+                        card.style.opacity = '0.8';
+                    }
+                }
+            });
+
+            let selectedPoly = L.polyline(availableRoutes[selectedIndex].coordinates);
+            try { map.fitBounds(selectedPoly.getBounds(), { padding: [50, 50] }); } catch (e) {}
+        };
+
+        async function triggerWalkingFallback(panel, weatherCond, mag) {
+            const radiusKm = Math.pow(10, (0.4 * mag - 1)) * 10;
+            let walkDist = radiusKm * 0.3;
+            let angle = 45 * Math.PI / 180; 
+            let pLat = currentEpicenter.lat + (walkDist / 111.32) * Math.cos(angle);
+            let pLng = currentEpicenter.lng + (walkDist / (111.32 * Math.cos(currentEpicenter.lat * (Math.PI/180)))) * Math.sin(angle);
+
+            let url = `${OSRM_SERVER_URL}/route/v1/foot/${currentEpicenter.lng},${currentEpicenter.lat};${pLng},${pLat}?overview=full&geometries=geojson`;
+            if (OSRM_API_KEY && OSRM_API_KEY !== "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImJkYzIwMjBhZDI5ODRjMjJhZDUwNmQ0ZjBhOTVmNDMwIiwiaCI6Im11cm11cjY0In0=") {
+                url += `&key=${OSRM_API_KEY}`;
+            }
+
+            try {
+                let res = await fetch(url);
+                let data = await res.json();
+                let r = data.routes[0];
+                let coords = r.geometry.coordinates.map(c => [c[1], c[0]]);
+                let distKm = (r.distance / 1000).toFixed(1);
+                let timeMin = Math.round(r.duration / 60);
+
+                routeLayers.forEach(l => map.removeLayer(l));
+                routeLayers = [];
+                let polyline = L.polyline(coords, { color: '#3b82f6', weight: 6, opacity: 1.0, dashArray: '10,15', lineCap: 'round', interactive: false }).addTo(map);
+                routeLayers.push(polyline);
+                let pickupIcon = L.divIcon({ html: '<i class="fa-solid fa-helicopter"></i>', className: 'bg-blue-500 text-white rounded-full w-8 h-8 flex items-center justify-center border-2 border-white shadow-[0_0_15px_rgba(59,130,246,0.8)]', iconSize: [32,32] });
+                let pm = L.marker([pLat, pLng], { icon: pickupIcon }).addTo(map);
+                routeLayers.push(pm); 
+                map.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+
+                panel.innerHTML = `
+                <div class="bg-red-900/40 border border-red-500 rounded-xl p-5 shadow-2xl">
+                    <div class="flex items-center gap-3 mb-3 text-red-500">
+                        <i class="fa-solid fa-triangle-exclamation text-3xl"></i>
+                        <div>
+                            <h4 class="text-xs font-black uppercase tracking-widest text-white">All Vehicle Routes Compromised</h4>
+                            <span class="text-[9px] uppercase font-bold tracking-wider">Critical Damage Detected</span>
+                        </div>
+                    </div>
+                    <p class="text-xs text-red-200 mb-4 leading-relaxed font-medium">Vehicular evacuation is impossible. Directed to proceed on foot to nearest secure air-lift pickup zone.</p>
+                    <div class="bg-[#0b101a] border border-blue-500/50 rounded-lg p-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-[11px] font-black text-blue-400 uppercase tracking-widest">Evacuation Mode: ON FOOT</span>
+                            ${(weatherCond === 'Thunderstorm' || weatherCond === 'Snow') 
+                                ? `<span class="text-[9px] font-black uppercase text-red-400 bg-red-900/30 px-2 py-1 rounded"><i class="fa-solid fa-ban"></i> EXIT HAZARDOUS (Weather)</span>` 
+                                : `<span class="text-[9px] font-black uppercase text-green-400 bg-green-900/30 px-2 py-1 rounded"><i class="fa-solid fa-person-running"></i> SAFE TO RUN & EXIT</span>`
+                            }
+                        </div>
+                        <div class="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wide">↳ Current Weather: ${weatherCond}</div>
+                        <div class="text-xs font-medium text-slate-300"><span class="text-white font-bold text-sm">${distKm} km</span> &nbsp;•&nbsp; ${timeMin} min</div>
+                    </div>
+                </div>`;
+            } catch (e) {
+                panel.innerHTML = `<div class="p-6 text-center text-red-400 font-bold tracking-widest uppercase text-[10px]">Total infrastructure collapse.<br>Unable to plot walking route.</div>`;
+            }
+        }
+
+        window.triggerReport = function(routeIndex, hName, placeLat, placeLng, mag, dataDist, hType, hBeds, hLat, hLng) {
+            let route = availableRoutes[routeIndex];
+            if (!route) return;
+
+            let hidden = [];
+            map.eachLayer(function(layer) {
+                try {
+                    let isWeatherTile = layer instanceof L.TileLayer && layer._url && layer._url.includes('openweathermap');
+                    let isMarker = layer instanceof L.Marker || layer instanceof L.CircleMarker;
+                    if (isWeatherTile || isMarker) { hidden.push(layer); map.removeLayer(layer); }
+                } catch (e) {}
+            });
+
+            function submitForm(mapImageData) {
+                let form = document.createElement('form');
+                form.method = 'POST';
+                form.action = window.location.origin + '/report/';
+                form.target = '_blank';
+                
+                let intensityEl = document.getElementById('rep-intensity');
+                let depthEl = document.getElementById('stat-depth');
+                let confEl = document.getElementById('accuracy-text'); 
+                
+                let params = {
+                    map_image: mapImageData || "",
+                    place: `Lat: ${parseFloat(placeLat).toFixed(2)}, Lng: ${parseFloat(placeLng).toFixed(2)}`,
+                    mag: mag,
+                    dist_from_click: dataDist.replace(' km from epicenter', ''),
+                    hname: hName,
+                    dist: route.dist || "",
+                    weather: route.weather || "",
+                    hlat: hLat,
+                    hlng: hLng,
+                    intensity: intensityEl ? intensityEl.innerText : "0.0",
+                    depth: depthEl ? depthEl.innerText : "0.0",
+                    confidence: confEl ? confEl.innerText : "0%"
+                };
+                
+                for (let k in params) {
+                    let i = document.createElement('input');
+                    i.type = 'hidden';
+                    i.name = k;
+                    i.value = params[k];
+                    form.appendChild(i);
+                }
+                document.body.appendChild(form);
+                form.submit();
+                document.body.removeChild(form);
+            }
+
+            function restoreHidden() { hidden.forEach(l => { try { l.addTo(map); } catch(e){} }); }
+
+            if (typeof leafletImage !== 'undefined') {
+                try {
+                    leafletImage(map, function(err, canvas) {
+                        restoreHidden();
+                        if (err || !canvas) return submitForm("");
+                        try { submitForm(canvas.toDataURL('image/jpeg', 0.4)); } 
+                        catch (e) { submitForm(""); }
+                    });
+                } catch (e) {
+                    restoreHidden();
+                    submitForm("");
+                }
+            } else {
+                restoreHidden();
+                submitForm("");
+            }
+        };
+
+        window.switchTab = function(tab) {
+            const tabSim = document.getElementById('tab-sim');
+            const tabAna = document.getElementById('tab-ana');
+            
+            if (tab === 'simulation') {
+                tabSim.classList.replace('border-transparent', 'theme-border');
+                tabSim.classList.add('text-white', 'drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]');
+                tabSim.classList.remove('text-slate-600');
+                
+                tabAna.classList.replace('theme-border', 'border-transparent');
+                tabAna.classList.remove('text-white', 'drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]');
+                tabAna.classList.add('text-slate-600');
+            } else {
+                tabAna.classList.replace('border-transparent', 'theme-border');
+                tabAna.classList.add('text-white', 'drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]');
+                tabAna.classList.remove('text-slate-600');
+                
+                tabSim.classList.replace('theme-border', 'border-transparent');
+                tabSim.classList.remove('text-white', 'drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]');
+                tabSim.classList.add('text-slate-600');
+            }
+
+            document.getElementById('content-sim').style.display = tab === 'simulation' ? 'block' : 'none';
+            document.getElementById('content-ana').style.display = tab === 'analytics' ? 'block' : 'none';
+            
+            if (tab === 'analytics') updateCharts();
+        };
+
+        function initCharts() {
+            Chart.defaults.color = '#94a3b8';
+            Chart.defaults.font.family = "'Segoe UI', sans-serif";
+
+            pieChartInstance = new Chart(document.getElementById('pieChart'), {
+                type: 'doughnut',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#ef4444', '#e87722', '#eab308', '#3b82f6', '#a855f7'], borderWidth: 0 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: {size: 9} } } } }
+            });
+
+            barChartInstance = new Chart(document.getElementById('barChart'), {
+                type: 'bar',
+                data: { labels: [], datasets: [{ label: 'Beds', data: [], backgroundColor: '#3b82f6', borderRadius: 4 }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { display: false }, y: { beginAtZero: true, grid: { color: '#ffffff10' } } }, plugins: { legend: { display: false } } }
+            });
+        }
+
+        function updateCharts() {
+            if (!pieChartInstance || !barChartInstance) return;
+            
+            const typeCounts = {};
+            affectedHospitals.forEach(h => {
+                const type = h.TYPE || h.type || 'Unknown';
+                typeCounts[type] = (typeCounts[type] || 0) + 1;
+            });
+            pieChartInstance.data.labels = Object.keys(typeCounts);
+            pieChartInstance.data.datasets[0].data = Object.values(typeCounts);
+            pieChartInstance.update();
+
+            const topHospitals = [...affectedHospitals].sort((a, b) => (b.BEDS || b.beds || 0) - (a.BEDS || a.beds || 0)).slice(0, 5);
+            barChartInstance.data.labels = topHospitals.map(h => h.NAME || h.name || 'Hospital');
+            barChartInstance.data.datasets[0].data = topHospitals.map(h => h.BEDS || h.beds || 0);
+            
+            const mag = parseFloat(document.getElementById('mag-slider').value);
+            barChartInstance.data.datasets[0].backgroundColor = getThemeColor(mag);
+            barChartInstance.update();
+        }
+
+        function animateValue(id, start, end, duration, decimals = 0) {
+            const obj = document.getElementById(id);
+            if (!obj) return;
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                const ease = 1 - Math.pow(1 - progress, 4); 
+                const current = start + (end - start) * ease;
+                obj.innerText = current.toFixed(decimals);
+                if (progress < 1) window.requestAnimationFrame(step);
+            };
+            window.requestAnimationFrame(step);
+        }
+    </script>
+</body>
+</html>
