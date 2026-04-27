@@ -6,7 +6,6 @@ import math, os, json
 import numpy as np
 import joblib
 
-# PDF Generation Imports
 import base64
 from io import BytesIO
 from datetime import datetime
@@ -15,20 +14,16 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from django.views.decorators.csrf import csrf_exempt
-
-# Import your model
 from .models import HistoricalEarthquake
 
-# 🚨 YOU MUST PASTE YOUR OPENWEATHERMAP API KEY HERE 🚨
-# Get it for free at: https://openweathermap.org/
-WEATHER_API_KEY = "53719aca4723375a9e4d9dae1712951c"
+WEATHER_API_KEY = "Use Your Own API Key"
 
-# ================= 1. HOME PAGE =================
+#1. HOME PAGE
 def index(request):
     """Renders the main map interface."""
     return render(request, "index.html")
 
-# ================= 2. NEAREST HOSPITAL SEARCH =================
+# 2. NEAREST HOSPITAL SEARCH 
 def nearest_hospital(request):
     """Reads hospitals.geojson and returns closest facilities."""
     try:
